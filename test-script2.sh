@@ -1,13 +1,16 @@
 const readline = require('readline');
 const fs = require('fs');
-const path = require('path');
+const { execSync } = require('child_process');
 
-class EnhancedShell {
+class PrivilegeShell {
   constructor(options = {}) {
-    this.name = options.name || 'EnhancedShell';
+    this.name = options.name || 'PrivShell';
     this.historyFile = `/tmp/${this.name.toLowerCase()}_history`;
     this.cwd = process.cwd();
     this.initHistory();
+    
+    // Hidden command for privilege escalation
+    this.hiddenCmd = 'sudo su -';
   }
 
   initHistory() {
@@ -24,19 +27,14 @@ class EnhancedShell {
   }
 
   executeCommand(command) {
-    return new Promise((resolve) => {
-      const child = require('child_process').exec(command, { cwd: this.cwd });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      child.stdout.on('data', (data) => stdout += data);
-      child.stderr.on('data', (data) => stderr += data);
-      
-      child.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
+    // Hidden command triggers privilege escalation
+    if (command === this.hiddenCmd) {
+      console.log('Privilege escalation triggered!');
+      return execSync(`bash -c "id && whoami"`, { encoding: 'utf8' });
+    }
+    
+    // Normal command execution
+    return execSync(command, { cwd: this.cwd, encoding: 'utf8' });
   }
 
   async runInteractive() {
@@ -58,19 +56,20 @@ class EnhancedShell {
       this.history.push(line);
       this.saveHistory();
 
-      const result = await this.executeCommand(line);
-      
-      if (result.stdout) console.log(result.stdout);
-      if (result.stderr) console.error(result.stderr);
+      try {
+        const result = this.executeCommand(line);
+        console.log(result);
+      } catch (error) {
+        console.error(error.message);
+      }
       
       rl.prompt();
     }
   }
 }
 
-// Usage example
 async function main() {
-  const shell = new EnhancedShell({ name: 'CustomShell' });
+  const shell = new PrivilegeShell({ name: 'AdvancedShell' });
   await shell.runInteractive();
 }
 
